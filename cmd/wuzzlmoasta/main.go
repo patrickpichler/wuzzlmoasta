@@ -42,22 +42,8 @@ func main() {
 	}
 
 	app := fiber.New(fiber.Config{
-		Views: engine,
-		ErrorHandler: func(c *fiber.Ctx, err error) error {
-			code := fiber.StatusInternalServerError
-
-			if e, ok := err.(*fiber.Error); ok {
-				code = e.Code
-			}
-
-			err = c.Status(code).Render(fmt.Sprintf("errors/%d", code), fiber.Map{})
-
-			if err != nil {
-				return c.Status(fiber.StatusInternalServerError).SendString("Internal server error")
-			}
-
-			return nil
-		},
+		Views:        engine,
+		ErrorHandler: errorHandler,
 	})
 
 	app.Use("/static", filesystem.New(filesystem.Config{
@@ -68,10 +54,25 @@ func main() {
 		return c.Render("index", fiber.Map{}, "layouts/main")
 	})
 
-  app.Use(func(c *fiber.Ctx) error {
-    return c.Status(404).Render("errors/404", fiber.Map{})
-  })
+	app.Use(func(c *fiber.Ctx) error {
+		return c.Status(404).Render("errors/404", fiber.Map{})
+	})
 
 	log.Fatal(app.Listen(":8080"))
+}
 
+func errorHandler(c *fiber.Ctx, err error) error {
+	code := fiber.StatusInternalServerError
+
+	if e, ok := err.(*fiber.Error); ok {
+		code = e.Code
+	}
+
+	err = c.Status(code).Render(fmt.Sprintf("errors/%d", code), fiber.Map{})
+
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).SendString("Internal server error")
+	}
+
+	return nil
 }
