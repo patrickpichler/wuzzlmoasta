@@ -6,16 +6,16 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 
 	"git.sr.ht/~patrickpichler/wuzzlmoasta/pkg/ui"
-	"github.com/labstack/echo/v4"
+	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/filesystem"
+	"github.com/gofiber/template/html"
 )
-
-func index(c echo.Context) error {
-	return c.Render(http.StatusOK, "index.html", "")
-}
 
 func main() {
 	flags := flag.NewFlagSet("", flag.PanicOnError)
@@ -24,39 +24,54 @@ func main() {
 
 	flags.Parse(os.Args[1:])
 
-	e := echo.New()
-
-	var webUI ui.UI
+	var engine *html.Engine
+	var staticFilesFs http.FileSystem
 
 	if *resourcesDir != "" {
 		if _, err := os.Stat(*resourcesDir); errors.Is(err, os.ErrNotExist) {
 			panic(fmt.Sprintf("folder `%s` does not exist", *resourcesDir))
 		}
 
-		webUI = ui.NewLive(*resourcesDir)
+		engine = html.New(filepath.Join(*resourcesDir, "views"), ".html")
+		engine.Reload(true)
+
+		staticFilesFs = http.Dir(filepath.Join(*resourcesDir, "static"))
 	} else {
-		webUI = ui.New()
+		engine = ui.CreateEmbeddedEngine()
+		staticFilesFs = ui.GetStaticFilesFs()
 	}
 
-	e.Renderer = webUI
+	app := fiber.New(fiber.Config{
+		Views: engine,
+		ErrorHandler: func(c *fiber.Ctx, err error) error {
+			code := fiber.StatusInternalServerError
 
-	e.HTTPErrorHandler = func(err error, c echo.Context) {
-		code := http.StatusInternalServerError
-		if he, ok := err.(*echo.HTTPError); ok {
-			code = he.Code
-		}
-		errorPage := fmt.Sprintf("%d.html", code)
+			if e, ok := err.(*fiber.Error); ok {
+				code = e.Code
+			}
 
-		if err := c.Render(code, errorPage, nil); err != nil {
-			c.Logger().Error(err)
-		}
-		c.Logger().Error(err)
-	}
+			err = c.Status(code).Render(fmt.Sprintf("errors/%d", code), fiber.Map{})
 
-	assetHandler := http.FileServer(http.FS(webUI.StaticAssets()))
+			if err != nil {
+				return c.Status(fiber.StatusInternalServerError).SendString("Internal server error")
+			}
 
-	e.GET("/", index)
-	e.GET("/static/*", echo.WrapHandler(http.StripPrefix("/static/", assetHandler)))
+			return nil
+		},
+	})
 
-	e.Logger.Fatal(e.Start(":8080"))
+	app.Use("/static", filesystem.New(filesystem.Config{
+		Root: staticFilesFs,
+	}))
+
+	app.Get("/", func(c *fiber.Ctx) error {
+		return c.Render("index", fiber.Map{}, "layouts/main")
+	})
+
+  app.Use(func(c *fiber.Ctx) error {
+    return c.Status(404).Render("errors/404", fiber.Map{})
+  })
+
+	log.Fatal(app.Listen(":8080"))
+
 }
