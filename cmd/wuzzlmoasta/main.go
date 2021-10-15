@@ -12,9 +12,16 @@ import (
 	"path/filepath"
 
 	"git.sr.ht/~patrickpichler/wuzzlmoasta/pkg/ui"
+	"git.sr.ht/~patrickpichler/wuzzlmoasta/pkg/users"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/filesystem"
 	"github.com/gofiber/template/html"
+)
+
+const (
+	UserSessionIdCookie = "UserSessionId"
+	UserLoggedIn        = "loggedIn"
+	User                = "user"
 )
 
 func main() {
@@ -50,8 +57,36 @@ func main() {
 		Root: staticFilesFs,
 	}))
 
-	app.Get("/", func(c *fiber.Ctx) error {
-		return c.Render("index", fiber.Map{}, "layouts/main")
+	app.Get("/", checkLoginOrRedirectToLoginPage, func(c *fiber.Ctx) error {
+		user := c.Locals(User).(users.ViewableUser)
+
+		return c.Render("index", fiber.Map{
+			"user": user,
+		}, "layouts/main")
+	})
+
+	app.Get("/login", func(c *fiber.Ctx) error {
+		return c.Render("login", fiber.Map{}, "layouts/main")
+	})
+
+	app.Post("/login", func(c *fiber.Ctx) error {
+		username := c.FormValue("username")
+		password := c.FormValue("password")
+
+		cookie, err := users.TryLogin(username, password)
+
+		if errors.Is(err, users.InvalidUsernameOrPassword) {
+			return c.Render("login", fiber.Map{
+				"invalidLogin": true,
+			}, "layouts/main")
+		}
+
+		c.Cookie(&fiber.Cookie{
+			Name:  UserSessionIdCookie,
+			Value: cookie,
+		})
+
+		return c.Redirect("/")
 	})
 
 	app.Use(func(c *fiber.Ctx) error {
@@ -61,11 +96,39 @@ func main() {
 	log.Fatal(app.Listen(":8080"))
 }
 
+func checkLoginOrRedirectToLoginPage(c *fiber.Ctx) error {
+	sessionId := c.Cookies(UserSessionIdCookie)
+
+	if valid, user := users.IsTokenValid(sessionId); valid {
+		c.Locals(User, *user)
+		return c.Next()
+	}
+
+	return c.Redirect("/login")
+}
+
+func setLoggedIn(c *fiber.Ctx) error {
+	sessionId := c.Cookies(UserSessionIdCookie)
+
+	if valid, user := users.IsTokenValid(sessionId); valid {
+		c.Locals(UserLoggedIn, "1")
+		c.Locals(User, user)
+	} else {
+		c.Locals(UserLoggedIn, "")
+	}
+
+	return c.Next()
+}
+
 func errorHandler(c *fiber.Ctx, err error) error {
 	code := fiber.StatusInternalServerError
 
 	if e, ok := err.(*fiber.Error); ok {
 		code = e.Code
+	}
+
+	if code == fiber.StatusInternalServerError {
+		log.Println(err)
 	}
 
 	err = c.Status(code).Render(fmt.Sprintf("errors/%d", code), fiber.Map{})

@@ -1,0 +1,18 @@
+<h1>Login</h1>
+<form action="login" method="post">
+  <div>
+    <span>Username</span>
+    <input type="text" name="username" value="">
+  </div>
+  <div>
+    <span>Password</span>
+    <input type="password" name="password" value="">
+  </div>
+  <button type="submit">Login</button>
+</form>
+
+{{ if .invalidLogin }}
+<div>
+  Wrong user or password!
+</div>
+{{ end }}
