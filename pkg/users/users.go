@@ -3,6 +3,7 @@ package users
 import (
 	"errors"
 
+	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -23,6 +24,7 @@ type UserStore interface {
 }
 
 type ViewableUser struct {
+	Id    uuid.UUID
 	Name  string
 	Roles []string
 }
@@ -30,8 +32,8 @@ type ViewableUser struct {
 func BuildInMemoryStore() UserStore {
 	return &inMemoryUserStore{
 		users: []inMemoryUser{
-			{"admin", mustEncrypt("admin"), []string{"admin"}},
-			{"seppl", mustEncrypt("1234"), []string{}},
+			{uuid.New(), "admin", mustEncrypt("admin"), []string{"admin"}},
+			{uuid.New(), "seppl", mustEncrypt("1234"), []string{}},
 		},
 	}
 }

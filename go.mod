@@ -16,3 +16,5 @@ require (
 	golang.org/x/crypto v0.0.0-20210921155107-089bfa567519
 	golang.org/x/sys v0.0.0-20211013075003-97ac67df715c // indirect
 )
+
+require github.com/google/uuid v1.3.0 // indirect

@@ -4,10 +4,12 @@ import (
 	"time"
 
 	"git.sr.ht/~patrickpichler/wuzzlmoasta/pkg/crypto"
+	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 )
 
 type inMemoryUser struct {
+	id       uuid.UUID
 	username string
 	password []byte
 	roles    []string
@@ -45,6 +47,7 @@ func (s *inMemoryUserStore) GetUserByName(name string) *ViewableUser {
 		if u.username == name {
 			ret := new(ViewableUser)
 			*ret = ViewableUser{
+				Id:    u.id,
 				Name:  name,
 				Roles: append([]string(nil), u.roles...),
 			}
