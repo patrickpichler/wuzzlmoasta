@@ -20,9 +20,22 @@ import (
 
 const (
 	UserSessionIdCookie = "UserSessionId"
-	UserLoggedIn        = "loggedIn"
-	User                = "user"
 )
+
+const (
+	LocalsUserLoggedIn = "loggedIn"
+	LocalsUser         = "user"
+	LocalsUserToken    = "userToken"
+)
+
+const (
+	RenderIsLoggedIn = "loggedIn"
+	RenderUser       = "user"
+)
+
+type handler struct {
+	userStore users.UserStore
+}
 
 func main() {
 	flags := flag.NewFlagSet("", flag.PanicOnError)
@@ -48,73 +61,103 @@ func main() {
 		staticFilesFs = ui.GetStaticFilesFs()
 	}
 
+	handler := handler{
+		userStore: users.BuildInMemoryStore(),
+	}
+
 	app := fiber.New(fiber.Config{
 		Views:        engine,
 		ErrorHandler: errorHandler,
 	})
 
+	app.Use(handler.setLoggedIn)
+
 	app.Use("/static", filesystem.New(filesystem.Config{
 		Root: staticFilesFs,
 	}))
 
-	app.Get("/", checkLoginOrRedirectToLoginPage, func(c *fiber.Ctx) error {
-		user := c.Locals(User).(users.ViewableUser)
+	app.Get("/", handler.checkLoginOrRedirectToLoginPage, handler.renderIndex)
 
-		return c.Render("index", fiber.Map{
-			"user": user,
-		}, "layouts/main")
-	})
-
-	app.Get("/login", func(c *fiber.Ctx) error {
-		return c.Render("login", fiber.Map{}, "layouts/main")
-	})
-
-	app.Post("/login", func(c *fiber.Ctx) error {
-		username := c.FormValue("username")
-		password := c.FormValue("password")
-
-		cookie, err := users.TryLogin(username, password)
-
-		if errors.Is(err, users.InvalidUsernameOrPassword) {
-			return c.Render("login", fiber.Map{
-				"invalidLogin": true,
-			}, "layouts/main")
-		}
-
-		c.Cookie(&fiber.Cookie{
-			Name:  UserSessionIdCookie,
-			Value: cookie,
-		})
-
-		return c.Redirect("/")
-	})
+	app.Get("/login", handler.renderLogin)
+	app.Post("/login", handler.doLogin)
 
 	app.Use(func(c *fiber.Ctx) error {
-		return c.Status(404).Render("errors/404", fiber.Map{})
+		return c.Status(404).Render("errors/404", handler.withDefault(c))
 	})
 
 	log.Fatal(app.Listen(":8080"))
 }
 
-func checkLoginOrRedirectToLoginPage(c *fiber.Ctx) error {
-	sessionId := c.Cookies(UserSessionIdCookie)
+func (h *handler) withDefault(c *fiber.Ctx, binds ...fiber.Map) fiber.Map {
+	target := fiber.Map{}
 
-	if valid, user := users.IsTokenValid(sessionId); valid {
-		c.Locals(User, *user)
+	loggedIn := c.Locals(LocalsUserLoggedIn) == true
+	target[RenderIsLoggedIn] = loggedIn
+
+	if loggedIn {
+		user := c.Locals(LocalsUser)
+
+		if _, ok := user.(*users.ViewableUser); ok {
+			target[RenderUser] = user
+		}
+	}
+
+	for _, b := range binds {
+		for k, v := range b {
+			target[k] = v
+		}
+	}
+
+	return target
+}
+
+func (h *handler) renderIndex(c *fiber.Ctx) error {
+	return c.Render("index", h.withDefault(c), "layouts/main")
+}
+
+func (h *handler) renderLogin(c *fiber.Ctx) error {
+	return c.Render("login", h.withDefault(c), "layouts/main")
+}
+
+func (h *handler) doLogin(c *fiber.Ctx) error {
+	username := c.FormValue("username")
+	password := c.FormValue("password")
+
+	cookie, err := h.userStore.TryLogin(username, password)
+
+	if errors.Is(err, users.InvalidUsernameOrPassword) {
+		return c.Render("login", h.withDefault(c, fiber.Map{
+			"invalidLogin": true,
+		}), "layouts/main")
+	}
+
+	c.Cookie(&fiber.Cookie{
+		Name:  UserSessionIdCookie,
+		Value: cookie,
+	})
+
+	return c.Redirect("/")
+}
+
+func (h *handler) checkLoginOrRedirectToLoginPage(c *fiber.Ctx) error {
+	loggedIn := c.Locals(LocalsUserLoggedIn)
+
+	if loggedIn == true {
 		return c.Next()
 	}
 
 	return c.Redirect("/login")
 }
 
-func setLoggedIn(c *fiber.Ctx) error {
+func (h *handler) setLoggedIn(c *fiber.Ctx) error {
 	sessionId := c.Cookies(UserSessionIdCookie)
 
-	if valid, user := users.IsTokenValid(sessionId); valid {
-		c.Locals(UserLoggedIn, "1")
-		c.Locals(User, user)
+	if valid, user := h.userStore.ValidateToken(sessionId); valid {
+		c.Locals(LocalsUserLoggedIn, true)
+		c.Locals(LocalsUser, user)
+		c.Locals(LocalsUserToken, sessionId)
 	} else {
-		c.Locals(UserLoggedIn, "")
+		c.Locals(LocalsUserLoggedIn, false)
 	}
 
 	return c.Next()
