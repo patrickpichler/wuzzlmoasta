@@ -16,7 +16,7 @@ type UserStore interface {
 	// otherwise an error is returned.
 	TryLogin(username, password string) (string, error)
 
-	GetUserByName(name string) *ViewableUser
+	GetUserByUsername(username string) *ViewableUser
 
 	ValidateToken(token string) (bool, *ViewableUser)
 

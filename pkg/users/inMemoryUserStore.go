@@ -42,13 +42,13 @@ func (s *inMemoryUserStore) TryLogin(username, password string) (string, error) 
 	return "", InvalidUsernameOrPassword
 }
 
-func (s *inMemoryUserStore) GetUserByName(name string) *ViewableUser {
+func (s *inMemoryUserStore) GetUserByUsername(username string) *ViewableUser {
 	for _, u := range s.users {
-		if u.username == name {
+		if u.username == username {
 			ret := new(ViewableUser)
 			*ret = ViewableUser{
 				Id:    u.id,
-				Name:  name,
+				Name:  username,
 				Roles: append([]string(nil), u.roles...),
 			}
 
@@ -70,7 +70,7 @@ func (s *inMemoryUserStore) ValidateToken(token string) (bool, *ViewableUser) {
 		if us.token == token {
 
 			if us.created.After(tokenValidStartingWith) {
-				return true, s.GetUserByName(us.username)
+				return true, s.GetUserByUsername(us.username)
 			}
 
 			// token expired
