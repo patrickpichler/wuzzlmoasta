@@ -81,6 +81,9 @@ func main() {
 	app.Get("/login", handler.renderLogin)
 	app.Post("/login", handler.doLogin)
 
+	app.Get("/logout", handler.doLogout)
+	app.Post("/logout", handler.doLogout)
+
 	app.Use(func(c *fiber.Ctx) error {
 		return c.Status(404).Render("errors/404", handler.withDefault(c))
 	})
@@ -113,6 +116,16 @@ func (h *handler) withDefault(c *fiber.Ctx, binds ...fiber.Map) fiber.Map {
 
 func (h *handler) renderIndex(c *fiber.Ctx) error {
 	return c.Render("index", h.withDefault(c), "layouts/main")
+}
+
+func (h *handler) doLogout(c *fiber.Ctx) error {
+	c.ClearCookie(UserSessionIdCookie)
+
+	if token, ok := c.Locals(LocalsUserToken).(string); ok {
+		h.userStore.InvalidateToken(token)
+	}
+
+	return c.Redirect("/login")
 }
 
 func (h *handler) renderLogin(c *fiber.Ctx) error {

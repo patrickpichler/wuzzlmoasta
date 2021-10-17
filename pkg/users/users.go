@@ -18,6 +18,8 @@ type UserStore interface {
 	GetUserByName(name string) *ViewableUser
 
 	ValidateToken(token string) (bool, *ViewableUser)
+
+	InvalidateToken(token string) bool
 }
 
 type ViewableUser struct {

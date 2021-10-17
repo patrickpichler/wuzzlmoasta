@@ -88,3 +88,23 @@ func (s *inMemoryUserStore) matchUser(username, password string) bool {
 
 	return false
 }
+
+func (s *inMemoryUserStore) InvalidateToken(token string) bool {
+	tokenIndex := -1
+
+	for i, s := range s.userSessions {
+		if s.token == token {
+			tokenIndex = i
+			break
+		}
+	}
+
+	if tokenIndex >= 0 {
+		s.userSessions[tokenIndex] = s.userSessions[len(s.userSessions)-1]
+		s.userSessions = s.userSessions[:len(s.userSessions)-1]
+
+		return true
+	}
+
+	return false
+}
