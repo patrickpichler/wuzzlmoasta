@@ -23,12 +23,16 @@ type UserStore interface {
 }
 
 type ViewableUser struct {
-	Name string
+	Name  string
+	Roles []string
 }
 
 func BuildInMemoryStore() UserStore {
 	return &inMemoryUserStore{
-		users: []inMemoryUser{{"admin", mustEncrypt("admin")}},
+		users: []inMemoryUser{
+			{"admin", mustEncrypt("admin"), []string{"admin"}},
+			{"seppl", mustEncrypt("1234"), []string{}},
+		},
 	}
 }
 

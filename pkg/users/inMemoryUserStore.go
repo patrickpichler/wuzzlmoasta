@@ -10,6 +10,7 @@ import (
 type inMemoryUser struct {
 	username string
 	password []byte
+	roles    []string
 }
 
 type inMemoryUserSession struct {
@@ -44,8 +45,10 @@ func (s *inMemoryUserStore) GetUserByName(name string) *ViewableUser {
 		if u.username == name {
 			ret := new(ViewableUser)
 			*ret = ViewableUser{
-				Name: name,
+				Name:  name,
+				Roles: append([]string(nil), u.roles...),
 			}
+
 			return ret
 		}
 	}

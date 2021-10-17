@@ -33,6 +33,10 @@ const (
 	RenderUser       = "user"
 )
 
+const (
+	RoleAdmin = "admin"
+)
+
 type handler struct {
 	userStore users.UserStore
 }
@@ -77,6 +81,7 @@ func main() {
 	}))
 
 	app.Get("/", handler.checkLoginOrRedirectToLoginPage, handler.renderIndex)
+	app.Get("/admin", handler.checkLoginOrRedirectToLoginPage, handler.enforceRole(RoleAdmin), handler.renderIndex)
 
 	app.Get("/login", handler.renderLogin)
 	app.Post("/login", handler.doLogin)
@@ -112,6 +117,11 @@ func (h *handler) withDefault(c *fiber.Ctx, binds ...fiber.Map) fiber.Map {
 	}
 
 	return target
+}
+
+func (h *handler) renderAdmin(c *fiber.Ctx) error {
+	// currently only a dummy implementation for testing role enforcement
+	return c.Render("index", h.withDefault(c), "layouts/main")
 }
 
 func (h *handler) renderIndex(c *fiber.Ctx) error {
@@ -160,6 +170,28 @@ func (h *handler) checkLoginOrRedirectToLoginPage(c *fiber.Ctx) error {
 	}
 
 	return c.Redirect("/login")
+}
+
+func (h *handler) enforceRole(role string) func(c *fiber.Ctx) error {
+	return func(c *fiber.Ctx) error {
+		if user, ok := c.Locals(LocalsUser).(*users.ViewableUser); ok {
+			if !hasRole(user, RoleAdmin) && !hasRole(user, role) {
+				return c.Status(fiber.StatusForbidden).Render("errors/401", h.withDefault(c))
+			}
+		}
+
+		return c.Next()
+	}
+}
+
+func hasRole(user *users.ViewableUser, role string) bool {
+	for _, r := range user.Roles {
+		if r == role {
+			return true
+		}
+	}
+
+	return false
 }
 
 func (h *handler) setLoggedIn(c *fiber.Ctx) error {
