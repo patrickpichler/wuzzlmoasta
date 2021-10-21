@@ -21,6 +21,11 @@ Go to the project directory
   $ cd wuzzlmoasta
 ```
 
+Run the project
+```bash
+  $ make run
+```
+
 Clean and build the project
 ```bash
   $ make clean
@@ -41,4 +46,3 @@ Make a release of the project
 ```bash
   $ make release
 ```
-
