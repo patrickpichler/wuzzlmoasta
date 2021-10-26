@@ -10,12 +10,16 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"time"
 
+	"git.sr.ht/~patrickpichler/wuzzlmoasta/pkg/data/game"
+	"git.sr.ht/~patrickpichler/wuzzlmoasta/pkg/store"
 	"git.sr.ht/~patrickpichler/wuzzlmoasta/pkg/ui"
 	"git.sr.ht/~patrickpichler/wuzzlmoasta/pkg/users"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/filesystem"
 	"github.com/gofiber/template/html"
+	"github.com/google/uuid"
 )
 
 const (
@@ -39,6 +43,7 @@ const (
 
 type handler struct {
 	userStore users.UserStore
+  dataStore store.Store
 }
 
 func main() {
@@ -67,6 +72,7 @@ func main() {
 
 	handler := handler{
 		userStore: users.BuildInMemoryStore(),
+    dataStore: store.New(),
 	}
 
 	app := fiber.New(fiber.Config{
